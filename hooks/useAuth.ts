@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export function useAuth() {
   const { data: session, status } = useSession();
@@ -10,8 +10,8 @@ export function useAuth() {
   return {
     user: session?.user,
     session,
-    isAuthenticated: status === 'authenticated',
-    isLoading: status === 'loading',
+    isAuthenticated: status === "authenticated",
+    isLoading: status === "loading",
     status,
   };
 }
@@ -22,11 +22,11 @@ export function useRequireAuth(requiredRole?: string) {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push('/login');
+      router.push("/login");
     }
 
     if (!isLoading && requiredRole && user?.role !== requiredRole) {
-      router.push('/');
+      router.push("/");
     }
   }, [isLoading, isAuthenticated, user?.role, requiredRole, router]);
 

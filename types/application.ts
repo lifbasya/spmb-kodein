@@ -1,10 +1,10 @@
-export type ApplicationStatus = 
-  | 'DRAFT' 
-  | 'SUBMITTED' 
-  | 'PENDING_VERIFICATION' 
-  | 'VERIFIED' 
-  | 'ACCEPTED' 
-  | 'REJECTED';
+export type ApplicationStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "PENDING_VERIFICATION"
+  | "VERIFIED"
+  | "ACCEPTED"
+  | "REJECTED";
 
 export interface Applicant {
   id: string;

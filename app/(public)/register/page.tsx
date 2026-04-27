@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { RegisterSchema } from '@/lib/validators/auth.schema';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { RegisterSchema } from "@/lib/validators/auth.schema";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -11,9 +11,9 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,16 +32,17 @@ export default function RegisterPage() {
       const validation = RegisterSchema.safeParse(formData);
       if (!validation.success) {
         const error = validation.error.flatten();
-        const firstError = Object.values(error.fieldErrors)[0]?.[0] || 'Validasi gagal';
+        const firstError =
+          Object.values(error.fieldErrors)[0]?.[0] || "Validasi gagal";
         setError(firstError);
         setLoading(false);
         return;
       }
 
       // Call register API
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
@@ -51,20 +52,20 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || 'Pendaftaran gagal');
+        setError(data.message || "Pendaftaran gagal");
         return;
       }
 
       setSuccess(true);
-      setFormData({ email: '', password: '', confirmPassword: '' });
+      setFormData({ email: "", password: "", confirmPassword: "" });
 
       // Redirect to login after 2 seconds
       setTimeout(() => {
-        router.push('/login');
+        router.push("/login");
       }, 2000);
     } catch (error) {
-      setError('Terjadi kesalahan. Silakan coba lagi.');
-      console.error('Register error:', error);
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+      console.error("Register error:", error);
     } finally {
       setLoading(false);
     }
@@ -73,7 +74,9 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center px-4">
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-2 text-gray-900">Daftar</h1>
+        <h1 className="text-3xl font-bold text-center mb-2 text-gray-900">
+          Daftar
+        </h1>
         <p className="text-center text-gray-600 mb-8">Buat akun SPMB baru</p>
 
         {error && (
@@ -90,7 +93,10 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Email
             </label>
             <input
@@ -107,7 +113,10 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Password
             </label>
             <input
@@ -124,7 +133,10 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="confirmPassword"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Konfirmasi Password
             </label>
             <input
@@ -145,14 +157,17 @@ export default function RegisterPage() {
             disabled={loading || success}
             className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Memproses...' : success ? 'Berhasil!' : 'Daftar'}
+            {loading ? "Memproses..." : success ? "Berhasil!" : "Daftar"}
           </button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            Sudah punya akun?{' '}
-            <Link href="/login" className="text-blue-600 hover:underline font-medium">
+            Sudah punya akun?{" "}
+            <Link
+              href="/login"
+              className="text-blue-600 hover:underline font-medium"
+            >
               Masuk di sini
             </Link>
           </p>

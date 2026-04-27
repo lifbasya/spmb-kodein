@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { LoginSchema } from '@/lib/validators/auth.schema';
+import { useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { LoginSchema } from "@/lib/validators/auth.schema";
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,29 +30,30 @@ export default function LoginPage() {
       const validation = LoginSchema.safeParse(formData);
       if (!validation.success) {
         const error = validation.error.flatten();
-        const firstError = Object.values(error.fieldErrors)[0]?.[0] || 'Validasi gagal';
+        const firstError =
+          Object.values(error.fieldErrors)[0]?.[0] || "Validasi gagal";
         setError(firstError);
         setLoading(false);
         return;
       }
 
       // Sign in with NextAuth
-      const result = await signIn('credentials', {
+      const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,
         redirect: false,
       });
 
       if (!result?.ok) {
-        setError(result?.error || 'Email atau password tidak valid');
+        setError(result?.error || "Email atau password tidak valid");
         return;
       }
 
       // Redirect based on role
-      router.push('/dashboard');
+      router.push("/dashboard");
     } catch (error) {
-      setError('Terjadi kesalahan. Silakan coba lagi.');
-      console.error('Login error:', error);
+      setError("Terjadi kesalahan. Silakan coba lagi.");
+      console.error("Login error:", error);
     } finally {
       setLoading(false);
     }
@@ -61,8 +62,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center px-4">
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-2 text-gray-900">Masuk</h1>
-        <p className="text-center text-gray-600 mb-8">Masuk ke akun SPMB Anda</p>
+        <h1 className="text-3xl font-bold text-center mb-2 text-gray-900">
+          Masuk
+        </h1>
+        <p className="text-center text-gray-600 mb-8">
+          Masuk ke akun SPMB Anda
+        </p>
 
         {error && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -72,7 +77,10 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Email
             </label>
             <input
@@ -89,7 +97,10 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Password
             </label>
             <input
@@ -110,14 +121,17 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Memproses...' : 'Masuk'}
+            {loading ? "Memproses..." : "Masuk"}
           </button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            Belum punya akun?{' '}
-            <Link href="/register" className="text-blue-600 hover:underline font-medium">
+            Belum punya akun?{" "}
+            <Link
+              href="/register"
+              className="text-blue-600 hover:underline font-medium"
+            >
               Daftar di sini
             </Link>
           </p>

@@ -45,6 +45,7 @@ npm run prisma:seed
 ```
 
 This will create an admin user:
+
 - Email: `admin@kodein.com`
 - Password: `Admin123!`
 
@@ -94,13 +95,13 @@ npx prisma studio
 Application follows strict status flow:
 
 ```
-DRAFT 
+DRAFT
   ↓
-SUBMITTED 
+SUBMITTED
   ↓
-PENDING_VERIFICATION 
+PENDING_VERIFICATION
   ↓
-VERIFIED 
+VERIFIED
   ├→ ACCEPTED
   └→ REJECTED
 ```

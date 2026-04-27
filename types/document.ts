@@ -1,8 +1,8 @@
-export type DocumentType = 
-  | 'FAMILY_CARD' 
-  | 'BIRTH_CERTIFICATE' 
-  | 'REPORT_CARD' 
-  | 'PHOTO';
+export type DocumentType =
+  | "FAMILY_CARD"
+  | "BIRTH_CERTIFICATE"
+  | "REPORT_CARD"
+  | "PHOTO";
 
 export interface Document {
   id: string;

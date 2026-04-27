@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
-import prisma from '@/lib/prisma';
-import { RegisterSchema } from '@/lib/validators/auth.schema';
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import prisma from "@/lib/prisma";
+import { RegisterSchema } from "@/lib/validators/auth.schema";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Validasi gagal',
+          message: "Validasi gagal",
           data: errors,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Email sudah terdaftar',
+          message: "Email sudah terdaftar",
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       data: {
         email,
         password: hashedPassword,
-        role: 'STUDENT',
+        role: "STUDENT",
       },
     });
 
@@ -54,12 +54,12 @@ export async function POST(request: NextRequest) {
     await prisma.applicant.create({
       data: {
         userId: user.id,
-        fullName: '',
-        birthPlace: '',
+        fullName: "",
+        birthPlace: "",
         birthDate: new Date(),
-        gender: '',
-        address: '',
-        phone: '',
+        gender: "",
+        address: "",
+        phone: "",
       },
     });
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       await prisma.application.create({
         data: {
           applicantId: applicant.id,
-          status: 'DRAFT',
+          status: "DRAFT",
         },
       });
     }
@@ -80,21 +80,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: 'Pendaftaran berhasil. Silakan login.',
+        message: "Pendaftaran berhasil. Silakan login.",
         data: {
           email: user.email,
         },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
-    console.error('Register error:', error);
+    console.error("Register error:", error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Terjadi kesalahan pada server',
+        message: "Terjadi kesalahan pada server",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

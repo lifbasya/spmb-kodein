@@ -1,14 +1,14 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
+const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting database seed...');
+  console.log("🌱 Starting database seed...");
 
   // Create admin user
-  const adminEmail = 'admin@kodein.com';
-  const adminPassword = 'Admin123!';
+  const adminEmail = "admin@kodein.com";
+  const adminPassword = "Admin123!";
 
   try {
     // Check if admin exists
@@ -17,7 +17,7 @@ async function main() {
     });
 
     if (existingAdmin) {
-      console.log('✅ Admin user already exists');
+      console.log("✅ Admin user already exists");
       return;
     }
 
@@ -29,24 +29,23 @@ async function main() {
       data: {
         email: adminEmail,
         password: hashedPassword,
-        role: 'ADMIN',
+        role: "ADMIN",
       },
     });
 
-    console.log('✅ Admin user created successfully');
+    console.log("✅ Admin user created successfully");
     console.log(`📧 Email: ${admin.email}`);
     console.log(`🔑 Default password: ${adminPassword}`);
-    console.log('⚠️  Please change this password after first login!');
+    console.log("⚠️  Please change this password after first login!");
   } catch (error) {
-    console.error('❌ Error seeding database:', error.message);
+    console.error("❌ Error seeding database:", error.message);
     throw error;
   } finally {
     await prisma.$disconnect();
   }
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

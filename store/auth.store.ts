@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { Session } from 'next-auth';
+import { create } from "zustand";
+import { Session } from "next-auth";
 
 interface AuthStore {
   session: Session | null;

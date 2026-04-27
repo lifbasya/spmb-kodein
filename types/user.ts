@@ -1,6 +1,6 @@
-import type { Applicant } from './application';
+import type { Applicant } from "./application";
 
-export type Role = 'STUDENT' | 'ADMIN';
+export type Role = "STUDENT" | "ADMIN";
 
 export interface User {
   id: string;
