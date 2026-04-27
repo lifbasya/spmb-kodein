@@ -1,51 +1,40 @@
-const { PrismaClient } = require("@prisma/client");
-const bcrypt = require("bcryptjs");
+const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 
-const prisma = new PrismaClient();
+const connectionString = process.env.DATABASE_URL || "postgresql://kartonosaleh@localhost:5432/spmb_db?schema=public";
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  console.log("🌱 Starting database seed...");
+  const adminEmail = 'admin@kodein.com';
+  const hashedPassword = await bcrypt.hash('Admin123!', 10);
 
-  // Create admin user
-  const adminEmail = "admin@kodein.com";
-  const adminPassword = "Admin123!";
+  console.log('--- Memulai Seeding ---');
 
-  try {
-    // Check if admin exists
-    const existingAdmin = await prisma.user.findUnique({
-      where: { email: adminEmail },
-    });
+  const admin = await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: {
+      password: hashedPassword,
+    },
+    create: {
+      email: adminEmail,
+      password: hashedPassword,
+      role: 'ADMIN',
+    },
+  });
 
-    if (existingAdmin) {
-      console.log("✅ Admin user already exists");
-      return;
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
-
-    // Create admin user
-    const admin = await prisma.user.create({
-      data: {
-        email: adminEmail,
-        password: hashedPassword,
-        role: "ADMIN",
-      },
-    });
-
-    console.log("✅ Admin user created successfully");
-    console.log(`📧 Email: ${admin.email}`);
-    console.log(`🔑 Default password: ${adminPassword}`);
-    console.log("⚠️  Please change this password after first login!");
-  } catch (error) {
-    console.error("❌ Error seeding database:", error.message);
-    throw error;
-  } finally {
-    await prisma.$disconnect();
-  }
+  console.log(`Admin user berhasil disiapkan: ${admin.email}`);
+  console.log('--- Seeding Selesai ---');
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error('Error saat seeding:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

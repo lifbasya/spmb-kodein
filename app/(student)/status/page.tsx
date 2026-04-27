@@ -153,17 +153,14 @@ export default async function StatusPage() {
   const applicant = await prisma.applicant.findUnique({
     where: { userId: session.user.id },
     include: {
-      application: {
-        include: { documents: true },
-      },
+      documents: true,
     },
   });
 
-  const application = applicant?.application;
   const status: ApplicationStatus =
-    (application?.status as ApplicationStatus) ?? "DRAFT";
+    (applicant?.status as ApplicationStatus) ?? "DRAFT";
   const config = STATUS_CONFIG[status];
-  const docCount = application?.documents?.length ?? 0;
+  const docCount = applicant?.documents?.length ?? 0;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -231,7 +228,7 @@ export default async function StatusPage() {
             <div className="flex justify-between items-center py-2 border-b border-gray-100">
               <span className="text-sm text-gray-600">Asal Sekolah</span>
               <span className="text-sm font-medium text-gray-900">
-                {application?.schoolOrigin || (
+                {applicant?.schoolOrigin || (
                   <span className="text-gray-400 italic">Belum diisi</span>
                 )}
               </span>
@@ -248,11 +245,11 @@ export default async function StatusPage() {
               </span>
             </div>
 
-            {application?.verifiedAt && (
+            {applicant?.verifiedAt && (
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-sm text-gray-600">Tanggal Verifikasi</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {new Date(application.verifiedAt).toLocaleDateString("id-ID", {
+                  {new Date(applicant.verifiedAt).toLocaleDateString("id-ID", {
                     day: "2-digit",
                     month: "long",
                     year: "numeric",
@@ -261,11 +258,11 @@ export default async function StatusPage() {
               </div>
             )}
 
-            {application?.decidedAt && (
+            {applicant?.decidedAt && (
               <div className="flex justify-between items-center py-2">
                 <span className="text-sm text-gray-600">Tanggal Keputusan</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {new Date(application.decidedAt).toLocaleDateString("id-ID", {
+                  {new Date(applicant.decidedAt).toLocaleDateString("id-ID", {
                     day: "2-digit",
                     month: "long",
                     year: "numeric",

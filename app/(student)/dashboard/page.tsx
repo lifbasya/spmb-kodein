@@ -18,16 +18,12 @@ export default async function DashboardPage() {
   const applicant = await prisma.applicant.findUnique({
     where: { userId: session.user.id },
     include: {
-      application: {
-        include: {
-          documents: true,
-        },
-      },
+      documents: true,
     },
   });
 
-  const app = applicant?.application;
-  const status = app?.status || "DRAFT";
+  const app = applicant;
+  const status = applicant?.status || "DRAFT";
   
   const statusConfig: Record<string, { label: string; bg: string; text: string; icon: string }> = {
     DRAFT: { label: "Draft", bg: "bg-slate-100", text: "text-slate-600", icon: "✏️" },

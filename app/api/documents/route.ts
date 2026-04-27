@@ -3,12 +3,6 @@ import { getSession } from "@/lib/auth-helpers";
 import { documentService } from "@/lib/services/document.service";
 import { DocumentTypeEnum } from "@/lib/validators/document.schema";
 
-// Tell Next.js NOT to parse the body — we handle FormData manually
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 /**
  * GET /api/documents

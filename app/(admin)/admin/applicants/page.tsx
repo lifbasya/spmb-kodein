@@ -7,13 +7,11 @@ interface Applicant {
   id: string;
   fullName: string;
   nisn: string | null;
+  status: string;
   createdAt: string;
   user: {
     email: string;
   };
-  application: {
-    status: string;
-  } | null;
 }
 
 export default function AdminApplicantsPage() {
@@ -48,13 +46,13 @@ export default function AdminApplicantsPage() {
       a.user.email.toLowerCase().includes(search.toLowerCase());
 
     const matchesStatus =
-      statusFilter === "ALL" || (a.application?.status === statusFilter);
+      statusFilter === "ALL" || (a.status === statusFilter);
 
     return matchesSearch && matchesStatus;
   });
 
   const getStatusBadge = (status: string | undefined) => {
-    if (!status) return <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded">No App</span>;
+    if (!status) return <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded">No Status</span>;
 
     const styles: Record<string, string> = {
       DRAFT: "bg-gray-100 text-gray-600",
@@ -86,14 +84,14 @@ export default function AdminApplicantsPage() {
           <input
             type="text"
             placeholder="Cari nama, NISN, atau email..."
-            className="input-field"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="w-full md:w-48">
           <select
-            className="input-field"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -108,14 +106,14 @@ export default function AdminApplicantsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         {loading ? (
           <div className="p-12 text-center text-gray-500">Memuat data...</div>
         ) : filteredApplicants.length === 0 ? (
           <div className="p-12 text-center text-gray-500">Tidak ada pendaftar yang ditemukan.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-6 py-4">Nama Lengkap</th>
@@ -133,7 +131,7 @@ export default function AdminApplicantsPage() {
                     <td className="px-6 py-4 text-sm text-gray-600">{a.user.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-500 font-mono">{a.nisn || "-"}</td>
                     <td className="px-6 py-4">
-                      {getStatusBadge(a.application?.status)}
+                      {getStatusBadge(a.status)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {new Date(a.createdAt).toLocaleDateString("id-ID")}
@@ -141,7 +139,7 @@ export default function AdminApplicantsPage() {
                     <td className="px-6 py-4 text-right">
                       <Link
                         href={`/admin/applicants/${a.id}`}
-                        className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                        className="text-blue-600 hover:text-blue-800 font-bold text-sm bg-blue-50 px-3 py-1.5 rounded-lg transition-all"
                       >
                         Detail
                       </Link>

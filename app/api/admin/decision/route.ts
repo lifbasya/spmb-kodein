@@ -4,7 +4,7 @@ import { adminService } from "@/lib/services/admin.service";
 import { z } from "zod";
 
 const DecisionSchema = z.object({
-  applicationId: z.string().min(1, "Application ID is required"),
+  applicantId: z.string().min(1, "Applicant ID is required"),
   status: z.enum(["ACCEPTED", "REJECTED"], {
     message: "Status must be ACCEPTED or REJECTED",
   }),
@@ -23,15 +23,15 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const application = await adminService.decideApplication(
-      validation.data.applicationId,
+    const applicant = await adminService.decideApplication(
+      validation.data.applicantId,
       validation.data.status
     );
 
     return NextResponse.json({
       success: true,
       message: `Application ${validation.data.status.toLowerCase()} successfully`,
-      data: application,
+      data: applicant,
     });
   } catch (error: any) {
     console.error("Decide application error:", error);

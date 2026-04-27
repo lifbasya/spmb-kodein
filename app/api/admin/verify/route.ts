@@ -4,7 +4,7 @@ import { adminService } from "@/lib/services/admin.service";
 import { z } from "zod";
 
 const VerifySchema = z.object({
-  applicationId: z.string().min(1, "Application ID is required"),
+  applicantId: z.string().min(1, "Applicant ID is required"),
 });
 
 export async function PUT(request: NextRequest) {
@@ -20,12 +20,12 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const application = await adminService.verifyApplication(validation.data.applicationId);
+    const applicant = await adminService.verifyApplication(validation.data.applicantId);
 
     return NextResponse.json({
       success: true,
       message: "Application verified successfully",
-      data: application,
+      data: applicant,
     });
   } catch (error: any) {
     console.error("Verify application error:", error);

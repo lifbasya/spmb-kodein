@@ -20,6 +20,8 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         });
 
+        console.log(`[AUTH] Mencari user: ${credentials.email} -> ${user ? 'Ditemukan' : 'Tidak Ditemukan'}`);
+
         if (!user) {
           throw new Error("Email atau password tidak valid");
         }
@@ -28,6 +30,8 @@ export const authOptions: NextAuthOptions = {
           credentials.password,
           user.password,
         );
+        
+        console.log(`[AUTH] Verifikasi password untuk ${credentials.email}: ${isPasswordValid ? 'Sukses' : 'Gagal'}`);
 
         if (!isPasswordValid) {
           throw new Error("Email atau password tidak valid");
@@ -52,7 +56,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as "STUDENT" | "ADMIN";
+        session.user.role = token.role as any;
       }
       return session;
     },

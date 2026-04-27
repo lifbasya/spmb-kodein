@@ -20,214 +20,176 @@ export function canTransition(from: string, to: string): boolean {
 
 export const applicationService = {
   /**
-   * GET — Read only. Returns null if applicant has no application yet.
+   * GET — Read only. Returns the applicant profile which now contains status.
    */
   async getApplication(userId: string) {
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
       include: {
-        application: {
-          include: { documents: true },
-        },
+        documents: true,
       },
     });
 
-    return applicant?.application ?? null;
+    return applicant ?? null;
   },
 
   /**
-   * POST — Idempotent create. Returns existing application or creates a DRAFT.
+   * POST — Idempotent get or create placeholder applicant if missing.
+   * Note: This is usually handled by the register API, but kept here for safety.
    */
   async getOrCreateApplication(userId: string) {
-    const applicant = await prisma.applicant.findUnique({
+    let applicant = await prisma.applicant.findUnique({
       where: { userId },
-      include: { application: true },
+      include: { documents: true },
     });
 
     if (!applicant) {
-      throw new Error("Applicant profile not found");
+      applicant = await prisma.applicant.create({
+        data: {
+          userId,
+          fullName: "",
+          birthPlace: "",
+          birthDate: new Date(0),
+          gender: "",
+          religion: "",
+          phoneNumber: "",
+          address: "",
+          status: "DRAFT",
+        },
+        include: { documents: true },
+      });
     }
 
-    if (applicant.application) {
-      return applicant.application;
-    }
-
-    // Create new DRAFT application
-    const application = await prisma.application.create({
-      data: {
-        applicantId: applicant.id,
-        status: "DRAFT",
-      },
-    });
-
-    return application;
+    return applicant;
   },
 
   /**
-   * PUT — Update application + applicant data. Only allowed in DRAFT status.
-   * Fixes: properly merges only provided fields (no undefined overwrite).
+   * PUT — Update applicant data (incorporates what was Application).
+   * Only allowed in DRAFT status.
    */
   async updateApplication(userId: string, data: UpdateApplicationInput) {
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
-      include: { application: true },
     });
 
     if (!applicant) {
       throw new Error("Applicant not found");
     }
 
-    if (!applicant.application) {
-      throw new Error("Application not found");
-    }
-
     // Business rule: only DRAFT can be updated
-    if (applicant.application.status !== "DRAFT") {
+    if (applicant.status !== "DRAFT") {
       throw new Error(
-        `Cannot update application in status: ${applicant.application.status}`,
+        `Cannot update application in status: ${applicant.status}`,
       );
     }
 
-    // Build applicant update payload — only include fields that were provided
-    const applicantUpdate: Record<string, unknown> = {};
-    if (data.fullName !== undefined) applicantUpdate.fullName = data.fullName;
-    if (data.nisn !== undefined) applicantUpdate.nisn = data.nisn;
-    if (data.birthPlace !== undefined)
-      applicantUpdate.birthPlace = data.birthPlace;
-    if (data.birthDate !== undefined)
-      applicantUpdate.birthDate = new Date(data.birthDate);
-    if (data.gender !== undefined) applicantUpdate.gender = data.gender;
-    if (data.address !== undefined) applicantUpdate.address = data.address;
-    if (data.phone !== undefined) applicantUpdate.phone = data.phone;
+    // Build update payload
+    const updatePayload: any = {};
+    
+    // Identity fields
+    if (data.fullName !== undefined) updatePayload.fullName = data.fullName;
+    if (data.nisn !== undefined) updatePayload.nisn = data.nisn;
+    if (data.birthPlace !== undefined) updatePayload.birthPlace = data.birthPlace;
+    if (data.birthDate !== undefined) updatePayload.birthDate = new Date(data.birthDate);
+    if (data.gender !== undefined) updatePayload.gender = data.gender;
+    if (data.religion !== undefined) updatePayload.religion = data.religion;
+    if (data.phoneNumber !== undefined) updatePayload.phoneNumber = data.phoneNumber;
+    if (data.address !== undefined) updatePayload.address = data.address;
+    
+    // School/Legacy Application fields
+    if (data.schoolOrigin !== undefined) updatePayload.schoolOrigin = data.schoolOrigin;
+    if (data.parentName !== undefined) updatePayload.parentName = data.parentName;
+    if (data.parentPhone !== undefined) updatePayload.parentPhone = data.parentPhone;
 
-    if (Object.keys(applicantUpdate).length > 0) {
-      await prisma.applicant.update({
+    if (Object.keys(updatePayload).length > 0) {
+      return await prisma.applicant.update({
         where: { id: applicant.id },
-        data: applicantUpdate,
+        data: updatePayload,
+        include: { documents: true },
       });
     }
 
-    // Build application update payload — only include fields that were provided
-    const applicationUpdate: Record<string, unknown> = {};
-    if (data.schoolOrigin !== undefined)
-      applicationUpdate.schoolOrigin = data.schoolOrigin;
-    if (data.parentName !== undefined)
-      applicationUpdate.parentName = data.parentName;
-    if (data.parentPhone !== undefined)
-      applicationUpdate.parentPhone = data.parentPhone;
-
-    if (Object.keys(applicationUpdate).length > 0) {
-      await prisma.application.update({
-        where: { id: applicant.application.id },
-        data: applicationUpdate,
-      });
-    }
-
-    return this.getApplication(userId);
+    return applicant;
   },
 
   /**
    * POST /submit — Transitions DRAFT → SUBMITTED.
-   * Enforces: required fields + at least one document + valid status.
    */
   async submitApplication(userId: string) {
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
-      include: {
-        application: {
-          include: { documents: true },
-        },
-      },
+      include: { documents: true },
     });
 
-    if (!applicant || !applicant.application) {
-      throw new Error("Application not found");
+    if (!applicant) {
+      throw new Error("Applicant not found");
     }
-
-    const app = applicant.application;
 
     // Enforce status transition
-    if (!canTransition(app.status, "SUBMITTED")) {
-      throw new Error(
-        `Cannot submit application in status: ${app.status}`,
-      );
+    if (!canTransition(applicant.status, "SUBMITTED")) {
+      throw new Error(`Cannot submit application in status: ${applicant.status}`);
     }
 
-    // Validate required applicant fields
+    // Validate required fields
     if (
       !applicant.fullName ||
       !applicant.birthPlace ||
-      !applicant.birthDate ||
       !applicant.gender ||
       !applicant.address ||
-      !applicant.phone
+      !applicant.phoneNumber ||
+      !applicant.schoolOrigin ||
+      !applicant.parentName ||
+      !applicant.parentPhone
     ) {
-      throw new Error(
-        "Harap lengkapi semua data pribadi sebelum submit",
-      );
+      throw new Error("Harap lengkapi semua data pendaftaran sebelum submit");
     }
 
-    // Validate required application fields
-    if (!app.schoolOrigin || !app.parentName || !app.parentPhone) {
-      throw new Error(
-        "Harap lengkapi data aplikasi (asal sekolah, nama orang tua, telepon orang tua)",
-      );
-    }
-
-    // Validate mandatory documents before submit
-    const hasFamilyCard = app.documents.some(d => d.type === "FAMILY_CARD");
-    const hasBirthCert = app.documents.some(d => d.type === "BIRTH_CERTIFICATE");
+    // Validate mandatory documents
+    const hasFamilyCard = applicant.documents.some(d => d.type === "FAMILY_CARD");
+    const hasBirthCert = applicant.documents.some(d => d.type === "BIRTH_CERTIFICATE");
 
     if (!hasFamilyCard || !hasBirthCert) {
-      throw new Error(
-        "Harap upload Kartu Keluarga dan Akta Kelahiran sebelum submit pendaftaran",
-      );
+      throw new Error("Harap upload Kartu Keluarga dan Akta Kelahiran sebelum submit");
     }
 
-    const updated = await prisma.application.update({
-      where: { id: app.id },
+    return await prisma.applicant.update({
+      where: { id: applicant.id },
       data: { status: "SUBMITTED" },
     });
-
-    return updated;
   },
 
   /**
    * Compute completion percentage for student dashboard.
-   * Total fields: 6 applicant + 3 application + 1 documents = 10
+   * Total fields: 10
    */
   async getCompletionStatus(userId: string) {
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
-      include: {
-        application: {
-          include: { documents: true },
-        },
-      },
+      include: { documents: true },
     });
 
-    if (!applicant?.application) {
+    if (!applicant) {
       return { percentage: 0, completed: 0, total: 10 };
     }
 
     let completed = 0;
     const total = 10;
 
-    // Applicant fields (6)
+    // Core fields
     if (applicant.fullName) completed++;
     if (applicant.birthPlace) completed++;
-    if (applicant.birthDate) completed++;
     if (applicant.gender) completed++;
     if (applicant.address) completed++;
-    if (applicant.phone) completed++;
+    if (applicant.phoneNumber) completed++;
+    if (applicant.religion) completed++;
+    
+    // Application fields
+    if (applicant.schoolOrigin) completed++;
+    if (applicant.parentName) completed++;
+    if (applicant.parentPhone) completed++;
 
-    // Application fields (3)
-    if (applicant.application.schoolOrigin) completed++;
-    if (applicant.application.parentName) completed++;
-    if (applicant.application.parentPhone) completed++;
-
-    // Documents (1)
-    if (applicant.application.documents.length > 0) completed++;
+    // Documents
+    if (applicant.documents.length > 0) completed++;
 
     return {
       percentage: Math.round((completed / total) * 100),

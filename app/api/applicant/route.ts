@@ -14,7 +14,6 @@ export async function GET(_request: NextRequest) {
 
     const applicant = await prisma.applicant.findUnique({
       where: { userId: session.user.id },
-      include: { application: true },
     });
 
     if (!applicant) {

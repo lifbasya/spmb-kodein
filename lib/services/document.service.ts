@@ -60,15 +60,13 @@ export const documentService = {
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
       include: {
-        application: {
-          include: { documents: true },
-        },
+        documents: true,
       },
     });
 
     return {
-      documents: applicant?.application?.documents ?? [],
-      status: applicant?.application?.status ?? "DRAFT",
+      documents: applicant?.documents ?? [],
+      status: applicant?.status ?? "DRAFT",
     };
   },
 
@@ -89,32 +87,28 @@ export const documentService = {
       throw new Error("Ukuran file melebihi batas 2 MB.");
     }
 
-    // 2. Fetch data
+    // 2. Fetch data (Now from consolidated Applicant model)
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
       include: {
-        application: {
-          include: { documents: true },
-        },
+        documents: true,
       },
     });
 
-    if (!applicant || !applicant.application) {
-      throw new Error("Aplikasi tidak ditemukan. Harap isi formulir terlebih dahulu.");
+    if (!applicant) {
+      throw new Error("Pendaftar tidak ditemukan. Harap isi formulir terlebih dahulu.");
     }
 
-    const application = applicant.application;
-
-    // 3. Status Check (Business Rules Phase 9)
-    if (application.status !== "DRAFT") {
-      throw new Error(`Tidak dapat mengunggah dokumen. Aplikasi dalam status: ${application.status}`);
+    // 3. Status Check (Applicant now holds status)
+    if (applicant.status !== "DRAFT") {
+      throw new Error(`Tidak dapat mengunggah dokumen. Aplikasi dalam status: ${applicant.status}`);
     }
 
     // 4. Upload to Cloudinary
     const { url, publicId } = await uploadToCloudinary(file, applicant.id);
 
     // 5. Replace existing if same type
-    const existing = application.documents.find((d) => d.type === documentType);
+    const existing = applicant.documents.find((d) => d.type === documentType);
 
     if (existing) {
       if (existing.cloudId) {
@@ -131,10 +125,10 @@ export const documentService = {
       });
     }
 
-    // 6. Create new record
+    // 6. Create new record (Attached to applicantId)
     return await prisma.document.create({
       data: {
-        applicationId: application.id,
+        applicantId: applicant.id,
         type: documentType as DocumentType,
         fileUrl: url,
         fileName: file.name,
@@ -151,20 +145,18 @@ export const documentService = {
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
       include: {
-        application: {
-          include: { documents: true },
-        },
+        documents: true,
       },
     });
 
-    const document = applicant?.application?.documents.find((d) => d.id === documentId);
+    const document = applicant?.documents.find((d) => d.id === documentId);
 
     if (!document) {
       throw new Error("Dokumen tidak ditemukan atau bukan milik Anda.");
     }
 
-    if (applicant?.application?.status !== "DRAFT") {
-      throw new Error(`Tidak dapat menghapus dokumen. Aplikasi dalam status: ${applicant?.application?.status}`);
+    if (applicant?.status !== "DRAFT") {
+      throw new Error(`Tidak dapat menghapus dokumen. Aplikasi dalam status: ${applicant?.status}`);
     }
 
     // Delete from Cloudinary

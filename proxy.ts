@@ -2,7 +2,7 @@ import { withAuth } from "next-auth/middleware";
 import type { NextRequestWithAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
-export const middleware = withAuth(
+export const proxy = withAuth(
   function middleware(request: NextRequestWithAuth) {
     const token = request.nextauth.token;
     const pathname = request.nextUrl.pathname;
@@ -45,5 +45,5 @@ export const middleware = withAuth(
 );
 
 export const config = {
-  matcher: ["/((?!api|_next|public|fonts).*)"],
+  matcher: ["/((?!api|_next|static|public|fonts|[\\w-]+\\.\\w+).*)"],
 };

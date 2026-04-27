@@ -4,7 +4,7 @@ import { adminService } from "@/lib/services/admin.service";
 import { z } from "zod";
 
 const ProcessSchema = z.object({
-  applicationId: z.string().min(1, "Application ID is required"),
+  applicantId: z.string().min(1, "Applicant ID is required"),
 });
 
 export async function PUT(request: NextRequest) {
@@ -20,12 +20,12 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const application = await adminService.processApplication(validation.data.applicationId);
+    const applicant = await adminService.processApplication(validation.data.applicantId);
 
     return NextResponse.json({
       success: true,
       message: "Application is now being processed",
-      data: application,
+      data: applicant,
     });
   } catch (error: any) {
     console.error("Process application error:", error);

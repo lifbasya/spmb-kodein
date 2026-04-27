@@ -3,7 +3,7 @@ import { ApplicationStatus } from "@prisma/client";
 
 export const adminService = {
   /**
-   * Get all applicants with their applications and documents
+   * Get all applicants with their documents
    */
   async getApplicants() {
     return await prisma.applicant.findMany({
@@ -13,11 +13,7 @@ export const adminService = {
             email: true,
           },
         },
-        application: {
-          include: {
-            documents: true,
-          },
-        },
+        documents: true,
       },
       orderBy: {
         createdAt: "desc",
@@ -30,13 +26,13 @@ export const adminService = {
    */
   async getStats() {
     const totalApplicants = await prisma.applicant.count();
-    const pending = await prisma.application.count({
+    const pending = await prisma.applicant.count({
       where: { status: "SUBMITTED" },
     });
-    const verified = await prisma.application.count({
+    const verified = await prisma.applicant.count({
       where: { status: "VERIFIED" },
     });
-    const accepted = await prisma.application.count({
+    const accepted = await prisma.applicant.count({
       where: { status: "ACCEPTED" },
     });
 
@@ -60,11 +56,7 @@ export const adminService = {
             email: true,
           },
         },
-        application: {
-          include: {
-            documents: true,
-          },
-        },
+        documents: true,
       },
     });
   },
@@ -72,22 +64,22 @@ export const adminService = {
   /**
    * Start processing an application (SUBMITTED -> PENDING_VERIFICATION)
    */
-  async processApplication(applicationId: string) {
-    const application = await prisma.application.findUnique({
-      where: { id: applicationId },
+  async processApplication(applicantId: string) {
+    const applicant = await prisma.applicant.findUnique({
+      where: { id: applicantId },
     });
 
-    if (!application) {
-      throw new Error("Aplikasi tidak ditemukan");
+    if (!applicant) {
+      throw new Error("Pendaftar tidak ditemukan");
     }
 
-    if (application.status !== "SUBMITTED") {
+    if (applicant.status !== "SUBMITTED") {
       // If already further in flow, ignore
-      return application;
+      return applicant;
     }
 
-    return await prisma.application.update({
-      where: { id: applicationId },
+    return await prisma.applicant.update({
+      where: { id: applicantId },
       data: {
         status: "PENDING_VERIFICATION",
       },
@@ -97,21 +89,21 @@ export const adminService = {
   /**
    * Verify an application (PENDING_VERIFICATION -> VERIFIED)
    */
-  async verifyApplication(applicationId: string) {
-    const application = await prisma.application.findUnique({
-      where: { id: applicationId },
+  async verifyApplication(applicantId: string) {
+    const applicant = await prisma.applicant.findUnique({
+      where: { id: applicantId },
     });
 
-    if (!application) {
-      throw new Error("Aplikasi tidak ditemukan");
+    if (!applicant) {
+      throw new Error("Pendaftar tidak ditemukan");
     }
 
-    if (application.status !== "PENDING_VERIFICATION") {
-      throw new Error(`Status aplikasi saat ini adalah ${application.status}. Hanya aplikasi dengan status PENDING_VERIFICATION yang dapat diverifikasi.`);
+    if (applicant.status !== "PENDING_VERIFICATION") {
+      throw new Error(`Status pendaftar saat ini adalah ${applicant.status}. Hanya pendaftar dengan status PENDING_VERIFICATION yang dapat diverifikasi.`);
     }
 
-    return await prisma.application.update({
-      where: { id: applicationId },
+    return await prisma.applicant.update({
+      where: { id: applicantId },
       data: {
         status: "VERIFIED",
         verifiedAt: new Date(),
@@ -122,21 +114,21 @@ export const adminService = {
   /**
    * Make a final decision on an application (VERIFIED -> ACCEPTED / REJECTED)
    */
-  async decideApplication(applicationId: string, status: "ACCEPTED" | "REJECTED") {
-    const application = await prisma.application.findUnique({
-      where: { id: applicationId },
+  async decideApplication(applicantId: string, status: "ACCEPTED" | "REJECTED") {
+    const applicant = await prisma.applicant.findUnique({
+      where: { id: applicantId },
     });
 
-    if (!application) {
-      throw new Error("Aplikasi tidak ditemukan");
+    if (!applicant) {
+      throw new Error("Pendaftar tidak ditemukan");
     }
 
-    if (application.status !== "VERIFIED") {
-      throw new Error(`Status aplikasi saat ini adalah ${application.status}. Hanya aplikasi dengan status VERIFIED yang dapat diberikan keputusan.`);
+    if (applicant.status !== "VERIFIED") {
+      throw new Error(`Status pendaftar saat ini adalah ${applicant.status}. Hanya pendaftar dengan status VERIFIED yang dapat diberikan keputusan.`);
     }
 
-    return await prisma.application.update({
-      where: { id: applicationId },
+    return await prisma.applicant.update({
+      where: { id: applicantId },
       data: {
         status: status as ApplicationStatus,
         decidedAt: new Date(),

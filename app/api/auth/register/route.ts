@@ -21,7 +21,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, password } = validation.data;
+    const { 
+      email, 
+      password, 
+      fullName, 
+      nisn, 
+      birthPlace, 
+      birthDate, 
+      gender, 
+      religion,
+      address, 
+      phone, 
+      schoolOrigin, 
+      parentName, 
+      parentPhone,
+      documents 
+    } = validation.data;
 
     // Check if email is already taken
     const existingUser = await prisma.user.findUnique({
@@ -41,8 +56,8 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Atomic: create User + Applicant + Application in a transaction
-    await prisma.$transaction(async (tx) => {
+    // Atomic: create User + Applicant in a transaction
+    const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           email,
@@ -51,44 +66,50 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Applicant profile — placeholder values, filled via /application form
       const applicant = await tx.applicant.create({
         data: {
           userId: user.id,
-          fullName: "",
-          birthPlace: "",
-          birthDate: new Date(0), // epoch as placeholder — replaced on first save
-          gender: "",
-          address: "",
-          phone: "",
+          fullName,
+          nisn,
+          birthPlace,
+          birthDate: new Date(birthDate),
+          gender,
+          religion,
+          address,
+          phoneNumber: phone,
+          schoolOrigin,
+          parentName,
+          parentPhone,
+          status: "SUBMITTED", // Langsung SUBMITTED karena data sudah lengkap
+          documents: {
+            create: documents?.map(doc => ({
+              type: doc.type as any,
+              fileUrl: doc.fileUrl,
+              fileName: doc.fileName,
+              fileSize: 0,
+              cloudId: doc.cloudId,
+            })) || [],
+          },
         },
       });
 
-      // Create initial DRAFT application
-      await tx.application.create({
-        data: {
-          applicantId: applicant.id,
-          status: "DRAFT",
-        },
-      });
-
-      return user;
+      return { user, applicant };
     });
 
     return NextResponse.json(
       {
         success: true,
-        message: "Pendaftaran berhasil. Silakan login.",
-        data: { email },
+        message: "Pendaftaran berhasil disimpan. Akun Anda telah dibuat.",
+        data: { user: { email: result.user.email }, applicantId: result.applicant.id },
       },
       { status: 201 },
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Register error:", error);
     return NextResponse.json(
       {
         success: false,
-        message: "Terjadi kesalahan pada server",
+        message: error.message || "Terjadi kesalahan pada server",
       },
       { status: 500 },
     );

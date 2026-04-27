@@ -4,6 +4,7 @@ out/
 *.log
 *.swp
 *.swo
+.env
 .env.local
 .env.*.local
 dist/
