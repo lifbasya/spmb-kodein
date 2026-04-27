@@ -74,7 +74,10 @@ export const documentService = {
       },
     });
 
-    return applicant?.application?.documents ?? [];
+    return {
+      documents: applicant?.application?.documents ?? [],
+      status: applicant?.application?.status ?? "DRAFT",
+    };
   },
 
   /**
@@ -119,12 +122,11 @@ export const documentService = {
       throw new Error("Aplikasi tidak ditemukan. Harap isi formulir terlebih dahulu.");
     }
 
-    // Documents can only be uploaded while application is in DRAFT or SUBMITTED status
-    // (admin may request re-upload in some workflows — keep flexible at document layer)
-    const lockedStatuses = ["ACCEPTED", "REJECTED"];
-    if (lockedStatuses.includes(application.status)) {
+    // Documents can only be uploaded while application is in DRAFT status
+    // Once submitted, the application is locked for the student.
+    if (application.status !== "DRAFT") {
       throw new Error(
-        "Tidak dapat mengubah dokumen setelah keputusan diberikan.",
+        `Tidak dapat mengunggah dokumen. Aplikasi sudah dalam status: ${application.status}`,
       );
     }
 
@@ -190,9 +192,9 @@ export const documentService = {
     }
 
     const status = applicant?.application?.status;
-    if (status === "ACCEPTED" || status === "REJECTED") {
+    if (status !== "DRAFT") {
       throw new Error(
-        "Tidak dapat menghapus dokumen setelah keputusan diberikan.",
+        `Tidak dapat menghapus dokumen. Aplikasi sudah dalam status: ${status}`,
       );
     }
 

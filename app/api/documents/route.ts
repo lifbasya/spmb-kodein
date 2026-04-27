@@ -24,12 +24,12 @@ export async function GET(_request: NextRequest) {
       );
     }
 
-    const documents = await documentService.getDocuments(session.user.id);
+    const result = await documentService.getDocuments(session.user.id);
 
     return NextResponse.json({
       success: true,
       message: "Documents retrieved",
-      data: documents,
+      data: result,
     });
   } catch (error: any) {
     console.error("Get documents error:", error);

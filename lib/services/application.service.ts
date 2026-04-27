@@ -174,10 +174,13 @@ export const applicationService = {
       );
     }
 
-    // Validate at least one document uploaded
-    if (app.documents.length === 0) {
+    // Validate mandatory documents before submit
+    const hasFamilyCard = app.documents.some(d => d.type === "FAMILY_CARD");
+    const hasBirthCert = app.documents.some(d => d.type === "BIRTH_CERTIFICATE");
+
+    if (!hasFamilyCard || !hasBirthCert) {
       throw new Error(
-        "Harap upload minimal satu dokumen sebelum submit",
+        "Harap upload Kartu Keluarga dan Akta Kelahiran sebelum submit pendaftaran",
       );
     }
 

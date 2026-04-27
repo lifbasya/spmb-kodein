@@ -45,6 +45,7 @@ export function getDocumentLabel(type: DocumentType): string {
 
 export function useDocuments() {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [status, setStatus] = useState<string>("DRAFT");
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [uploadStates, setUploadStates] = useState<
@@ -65,7 +66,8 @@ export function useDocuments() {
       const res = await fetch("/api/documents");
       const data = await res.json();
       if (data.success) {
-        setDocuments(data.data);
+        setDocuments(data.data.documents);
+        setStatus(data.data.status);
       } else {
         setFetchError(data.message || "Gagal memuat dokumen");
       }
@@ -192,5 +194,6 @@ export function useDocuments() {
     deleteDocument,
     getDocumentByType,
     refetch: fetchDocuments,
+    status,
   };
 }

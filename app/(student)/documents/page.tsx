@@ -43,6 +43,7 @@ interface DocumentCardProps {
     error: string | null;
     success: string | null;
   };
+  disabled?: boolean;
 }
 
 function DocumentCard({
@@ -51,12 +52,14 @@ function DocumentCard({
   onDelete,
   existing,
   state,
+  disabled = false,
 }: DocumentCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const label = getDocumentLabel(type);
-  const isBusy = state.isUploading || state.isDeleting;
+  const isBusy = state.isUploading || state.isDeleting || disabled;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const file = e.target.files?.[0];
     if (!file) return;
     await onUpload(type, file);
@@ -189,7 +192,10 @@ export default function DocumentsPage() {
     uploadDocument,
     deleteDocument,
     getDocumentByType,
+    status,
   } = useDocuments();
+
+  const isLocked = status !== "DRAFT";
 
   const uploadedCount = documents.length;
   const totalRequired = DOCUMENT_TYPES.length;
@@ -218,6 +224,14 @@ export default function DocumentsPage() {
             Upload semua dokumen persyaratan untuk melengkapi pendaftaran Anda.
           </p>
         </div>
+
+        {/* ── Status Info ────────────────────────────── */}
+        {isLocked && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-sm">
+            <p className="font-bold">⚠️ Dokumen Terkunci</p>
+            <p>Aplikasi Anda sudah dalam status <strong>{status}</strong>. Dokumen tidak dapat diubah lagi.</p>
+          </div>
+        )}
 
         {/* ── Fetch Error ──────────────────────────────── */}
         {fetchError && (
@@ -264,6 +278,7 @@ export default function DocumentsPage() {
               state={uploadStates[type]}
               onUpload={uploadDocument}
               onDelete={deleteDocument}
+              disabled={isLocked}
             />
           ))}
         </div>

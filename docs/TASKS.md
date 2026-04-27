@@ -88,11 +88,12 @@
 
 ---
 
-## Phase 9 - Business Rules
+## Phase 9 - Business Rules - ✅ COMPLETED
 
-- Prevent invalid status transition
-- Require documents before submit
-- Lock after accepted
+- [x] Prevent invalid status transition (Enforced in Service Layer)
+- [x] Require documents before submit (KK & Akta mandatory)
+- [x] Lock after submit (Form & Documents read-only after DRAFT)
+- [x] Decision immutability (Verified locks in Admin & Service)
 
 ---
 
