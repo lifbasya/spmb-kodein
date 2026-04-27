@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { SessionProvider } from "next-auth/react";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { ClientProviders } from "@/components/providers/ClientProviders";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
@@ -9,17 +7,15 @@ export const metadata: Metadata = {
   description: "Platform pendaftaran siswa baru yang mudah dan terpercaya",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
-
   return (
     <html lang="id">
       <body className="antialiased">
-        <SessionProvider session={session}>{children}</SessionProvider>
+        <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
   );

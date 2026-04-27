@@ -11,6 +11,7 @@ export default function ApplicationPage() {
   const { application, applicant, isLoading, error: fetchError, updateApplication, submitApplication } =
     useApplication();
 
+  const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -56,52 +57,65 @@ export default function ApplicationPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = async () => {
-    setFormError(null);
-    setFormSuccess(null);
-    setSaving(true);
+  const handleSave = async (silent = false) => {
+    if (!silent) {
+       setFormError(null);
+       setFormSuccess(null);
+       setSaving(true);
+    }
 
     const result = await updateApplication(formData);
 
-    if (!result.success) {
-      setFormError(result.message);
-    } else {
-      setFormSuccess(result.message);
-      setTimeout(() => setFormSuccess(null), 3000);
-      setSynced(false); // allow re-sync after save
+    if (!silent) {
+        if (!result.success) {
+          setFormError(result.message);
+        } else {
+          setFormSuccess("Draft berhasil disimpan");
+          setTimeout(() => setFormSuccess(null), 3000);
+          setSynced(false);
+        }
+        setSaving(false);
     }
-    setSaving(false);
+  };
+
+  const handleNext = async () => {
+     await handleSave(true);
+     setCurrentStep(prev => prev + 1);
+     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handlePrev = () => {
+     setCurrentStep(prev => prev - 1);
+     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubmit = async () => {
-    if (
-      !confirm(
-        "Setelah submit, Anda tidak dapat mengubah data lagi. Lanjutkan?",
-      )
-    ) {
-      return;
-    }
+    if (!confirm("Pastikan semua data sudah benar. Setelah submit, data tidak dapat diubah lagi. Lanjutkan?")) return;
 
     setFormError(null);
     setSubmitting(true);
-
     const result = await submitApplication();
 
     if (!result.success) {
       setFormError(result.message);
+      setSubmitting(false);
     } else {
       router.push("/documents");
     }
-
-    setSubmitting(false);
   };
+
+  const steps = [
+    { n: 1, title: "Data Diri", icon: "👤" },
+    { n: 2, title: "Kontak & Asal", icon: "🏠" },
+    { n: 3, title: "Orang Tua", icon: "👨‍👩‍👧" },
+  ];
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Memuat data...</p>
+          <p className="text-slate-500 font-medium">Menyiapkan formulir...</p>
         </div>
       </div>
     );
@@ -110,299 +124,167 @@ export default function ApplicationPage() {
   const isDraft = application?.status === "DRAFT";
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4 max-w-2xl">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h1 className="text-3xl font-bold mb-2">Formulir Aplikasi</h1>
-          <p className="text-gray-600 mb-6">
-            Lengkapi data pribadi dan aplikasi Anda
-          </p>
+    <div className="min-h-screen bg-slate-50 py-12 px-4">
+      <div className="max-w-xl mx-auto">
+        
+        {/* Header Section */}
+        <div className="mb-10 text-center">
+           <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3">Formulir Pendaftaran</h1>
+           <p className="text-slate-500">Lengkapi data pendaftaranmu secara bertahap.</p>
+        </div>
 
-          {/* Fetch error alert */}
-          {fetchError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              ⚠️ {fetchError}
+        {/* Stepper Logic */}
+        <div className="mb-10 bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex justify-between items-center relative overflow-hidden">
+           {steps.map((s) => (
+             <div key={s.n} className="flex flex-col items-center flex-1 relative z-10 transition-all duration-300">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold mb-2 transition-all ${
+                  currentStep === s.n ? 'bg-blue-600 text-white scale-110 shadow-lg shadow-blue-100' : 
+                  currentStep > s.n ? 'bg-green-100 text-green-600' : 'bg-slate-50 text-slate-400'
+                }`}>
+                   {currentStep > s.n ? '✓' : s.n}
+                </div>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${currentStep === s.n ? 'text-blue-600' : 'text-slate-400'}`}>
+                  {s.title}
+                </span>
+             </div>
+           ))}
+           <div className="absolute top-9 left-0 right-0 h-[2px] bg-slate-50 -z-0 mx-10"></div>
+        </div>
+
+        <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 p-8 md:p-12 relative overflow-hidden border border-slate-100">
+          
+          {/* Status Notifications */}
+          {fetchError && <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm font-medium">⚠️ {fetchError}</div>}
+          {!isDraft && (
+            <div className="mb-8 p-6 bg-blue-50 border-2 border-blue-100 rounded-3xl text-blue-800 text-center">
+               <p className="text-2xl mb-1">🔒</p>
+               <p className="font-bold">Aplikasi Terkunci</p>
+               <p className="text-xs opacity-70">Status saat ini: {application?.status}. Anda tidak dapat mengubah data.</p>
             </div>
           )}
-
-          {/* Non-DRAFT status banner */}
-          {!isDraft && application && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-300 rounded-lg text-blue-700">
-              ℹ️ Status aplikasi Anda:{" "}
-              <strong>{application.status}</strong>. Data tidak dapat diubah.
-            </div>
-          )}
-
-          {/* Form error */}
-          {formError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              ❌ {formError}
-            </div>
-          )}
-
-          {/* Form success */}
-          {formSuccess && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-              ✅ {formSuccess}
-            </div>
-          )}
+          {formError && <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm font-medium animate-shake">❌ {formError}</div>}
+          {formSuccess && <div className="mb-8 p-4 bg-green-50 border border-green-100 rounded-2xl text-green-600 text-sm font-medium animate-fade-in">✅ {formSuccess}</div>}
 
           {isDraft ? (
-            <>
-              {/* ── Personal Data ─────────────────────────────── */}
-              <div className="mb-8">
-                <h2 className="text-xl font-bold mb-4 pb-2 border-b">
-                  Data Pribadi
-                </h2>
+            <div className="space-y-8">
+              
+              {/* STEP 1: PERSONAL DATA */}
+              {currentStep === 1 && (
+                <div className="animate-fade-in">
+                   <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
+                      <span className="bg-blue-50 p-2 rounded-xl text-xl">👤</span> Data Pribadi
+                   </h2>
+                   <div className="space-y-5">
+                      <div className="group">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Nama Lengkap</label>
+                        <input name="fullName" type="text" value={formData.fullName} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold" placeholder="Contoh: Budi Santoso" />
+                      </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="fullName"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Nama Lengkap <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="fullName"
-                      name="fullName"
-                      type="text"
-                      required
-                      value={formData.fullName}
-                      onChange={handleInputChange}
-                      className="input-field"
-                      disabled={saving || submitting}
-                    />
-                  </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                           <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">NISN</label>
+                           <input name="nisn" type="text" value={formData.nisn} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold" placeholder="10 Digit NISN" />
+                        </div>
+                        <div>
+                           <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Jenis Kelamin</label>
+                           <select name="gender" value={formData.gender} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold appearance-none">
+                              <option value="">Pilih</option>
+                              <option value="MALE">Laki-laki</option>
+                              <option value="FEMALE">Perempuan</option>
+                           </select>
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label
-                        htmlFor="nisn"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
-                        NISN
-                      </label>
-                      <input
-                        id="nisn"
-                        name="nisn"
-                        type="text"
-                        value={formData.nisn}
-                        onChange={handleInputChange}
-                        className="input-field"
-                        disabled={saving || submitting}
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="gender"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
-                        Jenis Kelamin <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="gender"
-                        name="gender"
-                        required
-                        value={formData.gender}
-                        onChange={handleInputChange}
-                        className="input-field"
-                        disabled={saving || submitting}
-                      >
-                        <option value="">Pilih Jenis Kelamin</option>
-                        <option value="MALE">Laki-laki</option>
-                        <option value="FEMALE">Perempuan</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label
-                        htmlFor="birthPlace"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
-                        Tempat Lahir <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="birthPlace"
-                        name="birthPlace"
-                        type="text"
-                        required
-                        value={formData.birthPlace}
-                        onChange={handleInputChange}
-                        className="input-field"
-                        disabled={saving || submitting}
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="birthDate"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
-                        Tanggal Lahir <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        id="birthDate"
-                        name="birthDate"
-                        type="date"
-                        required
-                        value={formData.birthDate}
-                        onChange={handleInputChange}
-                        className="input-field"
-                        disabled={saving || submitting}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="phone"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Nomor Telepon <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      required
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      className="input-field"
-                      disabled={saving || submitting}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="address"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Alamat <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      id="address"
-                      name="address"
-                      required
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className="input-field"
-                      disabled={saving || submitting}
-                    />
-                  </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                           <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Tempat Lahir</label>
+                           <input name="birthPlace" type="text" value={formData.birthPlace} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold" />
+                        </div>
+                        <div>
+                           <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Tanggal Lahir</label>
+                           <input name="birthDate" type="date" value={formData.birthDate} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold" />
+                        </div>
+                      </div>
+                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* ── Application Data ──────────────────────────── */}
-              <div className="mb-8">
-                <h2 className="text-xl font-bold mb-4 pb-2 border-b">
-                  Data Aplikasi
-                </h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="schoolOrigin"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Asal Sekolah <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="schoolOrigin"
-                      name="schoolOrigin"
-                      type="text"
-                      required
-                      value={formData.schoolOrigin}
-                      onChange={handleInputChange}
-                      className="input-field"
-                      disabled={saving || submitting}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="parentName"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Nama Orang Tua / Wali <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="parentName"
-                      name="parentName"
-                      type="text"
-                      required
-                      value={formData.parentName}
-                      onChange={handleInputChange}
-                      className="input-field"
-                      disabled={saving || submitting}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="parentPhone"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Nomor Telepon Orang Tua / Wali{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="parentPhone"
-                      name="parentPhone"
-                      type="tel"
-                      required
-                      value={formData.parentPhone}
-                      onChange={handleInputChange}
-                      className="input-field"
-                      disabled={saving || submitting}
-                    />
-                  </div>
+              {/* STEP 2: CONTACT & SCHOOL */}
+              {currentStep === 2 && (
+                <div className="animate-fade-in text-slate-900">
+                   <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
+                      <span className="bg-green-50 p-2 rounded-xl text-xl">🏠</span> Kontak & Asal
+                   </h2>
+                   <div className="space-y-5">
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Nomor Telepon</label>
+                        <input name="phone" type="tel" value={formData.phone} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold" placeholder="0812..." />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Alamat Lengkap</label>
+                        <textarea name="address" value={formData.address} onChange={handleInputChange} rows={3} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold" placeholder="Tulis alamat rumah lengkap..." />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Asal Sekolah (SMP/MTs)</label>
+                        <input name="schoolOrigin" type="text" value={formData.schoolOrigin} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold" />
+                      </div>
+                   </div>
                 </div>
+              )}
+
+              {/* STEP 3: PARENTS */}
+              {currentStep === 3 && (
+                <div className="animate-fade-in">
+                   <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
+                      <span className="bg-purple-50 p-2 rounded-xl text-xl">👨‍👩‍👧</span> Data Orang Tua
+                   </h2>
+                   <div className="space-y-5">
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Nama Orang Tua / Wali</label>
+                        <input name="parentName" type="text" value={formData.parentName} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Telepon Orang Tua / Wali</label>
+                        <input name="parentPhone" type="tel" value={formData.parentPhone} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl px-5 py-4 transition-all outline-none font-bold" />
+                      </div>
+                   </div>
+                   
+                   <div className="mt-8 p-6 bg-yellow-50 border-2 border-yellow-100 rounded-3xl">
+                      <p className="text-xs font-black text-yellow-700 uppercase tracking-[.2em] mb-2">Konfirmasi Akhir</p>
+                      <p className="text-xs text-yellow-800 opacity-80 leading-relaxed">
+                        Pastikan data Orang Tua/Wali dapat dihubungi oleh panitia untuk informasi wawancara dan verifikasi lanjutan.
+                      </p>
+                   </div>
+                </div>
+              )}
+
+              {/* NAVIGATION BUTTONS */}
+              <div className="pt-10 flex flex-col sm:flex-row gap-4">
+                 {currentStep > 1 && (
+                   <button onClick={handlePrev} className="flex-1 bg-slate-100 text-slate-600 font-black py-5 rounded-2xl hover:bg-slate-200 transition-all uppercase tracking-widest text-xs">Kembali</button>
+                 )}
+                 
+                 {currentStep < 3 ? (
+                   <button onClick={handleNext} className="flex-[2] bg-blue-600 text-white font-black py-5 rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all uppercase tracking-widest text-xs">Simpan & Lanjut</button>
+                 ) : (
+                   <div className="flex-[2] flex gap-4 w-full">
+                      <button onClick={() => handleSave()} disabled={saving} className="flex-1 border-2 border-blue-600 text-blue-600 font-black py-5 rounded-2xl hover:bg-blue-50 transition-all uppercase tracking-widest text-xs">Draft</button>
+                      <button onClick={handleSubmit} disabled={submitting} className="flex-[2] bg-green-600 text-white font-black py-5 rounded-2xl hover:bg-green-700 shadow-xl shadow-green-100 transition-all uppercase tracking-widest text-xs">Submit Akhir</button>
+                   </div>
+                 )}
               </div>
 
-              {/* ── Actions ───────────────────────────────────── */}
-              <div className="flex gap-4">
-                <button
-                  id="btn-save-application"
-                  onClick={handleSave}
-                  disabled={saving || submitting}
-                  className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? "Menyimpan..." : "Simpan Draft"}
-                </button>
-                <button
-                  id="btn-submit-application"
-                  onClick={handleSubmit}
-                  disabled={saving || submitting}
-                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? "Memproses..." : "Submit Aplikasi"}
-                </button>
-              </div>
-
-              <p className="mt-3 text-xs text-gray-500 text-center">
-                ⚠️ Setelah submit, data tidak dapat diubah. Pastikan semua
-                dokumen sudah diunggah.
-              </p>
-            </>
+               <p className="text-[10px] text-slate-400 text-center font-bold uppercase tracking-tighter">Draft Anda tersimpan otomatis saat berpindah halaman.</p>
+            </div>
           ) : (
-            <div className="bg-yellow-50 border border-yellow-300 p-6 rounded-lg text-yellow-800">
-              <p className="font-semibold mb-2">⚠️ Aplikasi Terkunci</p>
-              <p>Aplikasi Anda telah disubmit dan tidak dapat diubah lagi.</p>
-              <p className="mt-2">
-                Status saat ini:{" "}
-                <strong className="text-blue-700">{application?.status}</strong>
-              </p>
-              <a
-                href="/status"
-                className="inline-block mt-4 text-blue-600 hover:underline text-sm"
-              >
-                → Lihat status verifikasi
-              </a>
+            <div className="text-center py-8">
+               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-3xl mx-auto mb-6">🎉</div>
+               <h3 className="text-2xl font-black text-slate-900 mb-2">Aplikasi Terkirim</h3>
+               <p className="text-slate-500 mb-10">Data Anda sudah aman di server kami. Silakan lanjutkan untuk mengunggah dokumen jika belum lengkap.</p>
+               <div className="flex flex-col gap-3">
+                  <a href="/documents" className="bg-blue-600 text-white font-black py-5 rounded-2xl hover:bg-blue-700 transition-all uppercase tracking-widest text-xs">Upload Dokumen →</a>
+                  <a href="/status" className="bg-slate-100 text-slate-600 font-black py-5 rounded-2xl hover:bg-slate-200 transition-all uppercase tracking-widest text-xs">Cek Status</a>
+               </div>
             </div>
           )}
         </div>
