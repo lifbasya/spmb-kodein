@@ -13,12 +13,12 @@
     "prisma:seed": "node prisma/seed.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.18.0",
+    "@prisma/client": "^7.8.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
     "next": "^16.2.4",
     "next-auth": "^4.24.14",
-    "prisma": "^5.18.0",
+    "prisma": "^7.8.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.74.0",
