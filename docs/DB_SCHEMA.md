@@ -1,0 +1,80 @@
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_VERIFICATION
+  VERIFIED
+  ACCEPTED
+  REJECTED
+}
+
+enum DocumentType {
+  FAMILY_CARD
+  BIRTH_CERTIFICATE
+  REPORT_CARD
+  PHOTO
+}
+
+model User {
+  id        String @id @default(cuid())
+  email     String @unique
+  password  String
+  role      Role   @default(STUDENT)
+
+  applicant Applicant?
+
+  createdAt DateTime @default(now())
+}
+
+model Applicant {
+  id          String @id @default(cuid())
+  userId      String @unique
+
+  fullName    String
+  nisn        String?
+  birthPlace  String
+  birthDate   DateTime
+  gender      String
+  address     String
+  phone       String
+
+  user        User @relation(fields: [userId], references: [id])
+  application Application?
+
+  createdAt   DateTime @default(now())
+}
+
+model Application {
+  id          String @id @default(cuid())
+  applicantId String @unique
+  status      ApplicationStatus @default(DRAFT)
+
+  schoolOrigin String
+  parentName   String
+  parentPhone  String
+
+  applicant   Applicant @relation(fields: [applicantId], references: [id])
+  documents   Document[]
+
+  verifiedAt  DateTime?
+  decidedAt   DateTime?
+
+  createdAt   DateTime @default(now())
+}
+
+model Document {
+  id            String @id @default(cuid())
+  applicationId String
+  type          DocumentType
+  fileUrl       String
+  fileName      String
+  fileSize      Int
+
+  application Application @relation(fields: [applicationId], references: [id])
+
+  createdAt DateTime @default(now())
+}
