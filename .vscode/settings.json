@@ -1,0 +1,8 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "/^Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
+}
