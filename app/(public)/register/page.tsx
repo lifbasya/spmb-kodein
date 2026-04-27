@@ -108,7 +108,14 @@ const ApplicationForm = () => {
         alert("Pendaftaran Berhasil! Akun Anda telah dibuat. Silakan login.");
         router.push("/login");
       } else {
-        alert(data.message || "Gagal mendaftar. Periksa kembali inputan Anda.");
+        // Jika ada detail error dari Zod (data.data), tampilkan yang pertama
+        if (data.data && typeof data.data === 'object') {
+          const fieldErrors = data.data.fieldErrors;
+          const firstError = Object.values(fieldErrors)[0] as string[];
+          alert(`Validasi Gagal: ${firstError[0]}`);
+        } else {
+          alert(data.message || "Gagal mendaftar. Periksa kembali inputan Anda.");
+        }
       }
     } catch (error) {
       console.error("Submit error:", error);
