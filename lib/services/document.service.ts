@@ -1,7 +1,6 @@
-import { writeFile, mkdir, unlink } from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
+import cloudinary from "@/lib/cloudinary";
 import prisma from "@/lib/prisma";
+import { DocumentType } from "@prisma/client";
 
 // Allowed MIME types per PRD.md §8 and SYSTEM_DESIGN.md §7
 const ALLOWED_MIME_TYPES = [
@@ -12,51 +11,44 @@ const ALLOWED_MIME_TYPES = [
 ];
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 
-// Storage: local filesystem under /public/uploads (MVP)
-// Future: replace saveToLocal() with cloud provider (S3/Supabase)
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
-
-async function ensureUploadDir() {
-  if (!existsSync(UPLOAD_DIR)) {
-    await mkdir(UPLOAD_DIR, { recursive: true });
-  }
-}
-
-async function saveToLocal(
+/**
+ * Upload file buffer to Cloudinary
+ */
+async function uploadToCloudinary(
   file: File,
-  applicationId: string,
-): Promise<{ fileUrl: string; fileName: string; fileSize: number }> {
-  await ensureUploadDir();
-
+  folder: string
+): Promise<{ url: string; publicId: string }> {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  // Sanitize filename — prevent path traversal
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "bin";
-  const safeName = `${applicationId}_${Date.now()}.${extension}`;
-  const filePath = path.join(UPLOAD_DIR, safeName);
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: `spmb/${folder}`,
+        resource_type: "auto",
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        if (!result) return reject(new Error("Cloudinary upload failed"));
+        resolve({
+          url: result.secure_url,
+          publicId: result.public_id,
+        });
+      }
+    );
 
-  await writeFile(filePath, buffer);
-
-  return {
-    fileUrl: `/uploads/${safeName}`,
-    fileName: file.name,
-    fileSize: file.size,
-  };
+    uploadStream.end(buffer);
+  });
 }
 
-async function deleteFromLocal(fileUrl: string) {
+/**
+ * Delete file from Cloudinary
+ */
+async function deleteFromCloudinary(publicId: string) {
   try {
-    // fileUrl is like /uploads/xxx.pdf
-    const filename = fileUrl.split("/").pop();
-    if (!filename) return;
-    const filePath = path.join(UPLOAD_DIR, filename);
-    if (existsSync(filePath)) {
-      await unlink(filePath);
-    }
+    await cloudinary.uploader.destroy(publicId);
   } catch (err) {
-    // Log but don't throw — DB record cleanup takes priority
-    console.warn("File delete warning:", err);
+    console.warn("Cloudinary delete warning:", err);
   }
 }
 
@@ -81,29 +73,23 @@ export const documentService = {
   },
 
   /**
-   * Upload a document file and store its metadata in the DB.
-   * Business rules (from EDGE_CASES.md + PRD.md):
-   *   - File type must be JPG, PNG, or PDF
-   *   - File size max 2 MB
-   *   - If same DocumentType already exists, replace it (re-upload)
+   * Upload a document file to Cloudinary and store metadata.
    */
   async uploadDocument(
     userId: string,
     file: File,
-    documentType: string,
+    documentType: string
   ) {
-    // ─── 1. File validation ───────────────────────────────────────────────
+    // 1. Validation
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      throw new Error(
-        "Format file tidak valid. Gunakan JPG, PNG, atau PDF.",
-      );
+      throw new Error("Format file tidak valid. Gunakan JPG, PNG, atau PDF.");
     }
 
     if (file.size > MAX_FILE_SIZE) {
       throw new Error("Ukuran file melebihi batas 2 MB.");
     }
 
-    // ─── 2. Fetch applicant + application ────────────────────────────────
+    // 2. Fetch data
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
       include: {
@@ -113,67 +99,55 @@ export const documentService = {
       },
     });
 
-    if (!applicant) {
-      throw new Error("Data pendaftar tidak ditemukan.");
-    }
-
-    const application = applicant.application;
-    if (!application) {
+    if (!applicant || !applicant.application) {
       throw new Error("Aplikasi tidak ditemukan. Harap isi formulir terlebih dahulu.");
     }
 
-    // Documents can only be uploaded while application is in DRAFT status
-    // Once submitted, the application is locked for the student.
+    const application = applicant.application;
+
+    // 3. Status Check (Business Rules Phase 9)
     if (application.status !== "DRAFT") {
-      throw new Error(
-        `Tidak dapat mengunggah dokumen. Aplikasi sudah dalam status: ${application.status}`,
-      );
+      throw new Error(`Tidak dapat mengunggah dokumen. Aplikasi dalam status: ${application.status}`);
     }
 
-    // ─── 3. Save file to local storage ───────────────────────────────────
-    const { fileUrl, fileName, fileSize } = await saveToLocal(
-      file,
-      application.id,
-    );
+    // 4. Upload to Cloudinary
+    const { url, publicId } = await uploadToCloudinary(file, applicant.id);
 
-    // ─── 4. Replace existing document of same type (re-upload) ───────────
-    const existing = application.documents.find(
-      (d) => d.type === documentType,
-    );
+    // 5. Replace existing if same type
+    const existing = application.documents.find((d) => d.type === documentType);
 
     if (existing) {
-      // Delete old file from disk
-      await deleteFromLocal(existing.fileUrl);
-
-      // Update DB record
-      const updated = await prisma.document.update({
+      if (existing.cloudId) {
+        await deleteFromCloudinary(existing.cloudId);
+      }
+      return await prisma.document.update({
         where: { id: existing.id },
-        data: { fileUrl, fileName, fileSize },
+        data: {
+          fileUrl: url,
+          fileName: file.name,
+          fileSize: file.size,
+          cloudId: publicId,
+        },
       });
-      return updated;
     }
 
-    // ─── 5. Create new document record ───────────────────────────────────
-    const document = await prisma.document.create({
+    // 6. Create new record
+    return await prisma.document.create({
       data: {
         applicationId: application.id,
-        // @ts-ignore — type is validated as DocumentType string by Zod upstream
-        type: documentType,
-        fileUrl,
-        fileName,
-        fileSize,
+        type: documentType as DocumentType,
+        fileUrl: url,
+        fileName: file.name,
+        fileSize: file.size,
+        cloudId: publicId,
       },
     });
-
-    return document;
   },
 
   /**
-   * Delete a document by ID.
-   * Only the owner can delete their own document.
+   * Delete document by ID
    */
   async deleteDocument(userId: string, documentId: string) {
-    // Verify ownership — find the document through the application chain
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
       include: {
@@ -183,25 +157,24 @@ export const documentService = {
       },
     });
 
-    const document = applicant?.application?.documents.find(
-      (d) => d.id === documentId,
-    );
+    const document = applicant?.application?.documents.find((d) => d.id === documentId);
 
     if (!document) {
       throw new Error("Dokumen tidak ditemukan atau bukan milik Anda.");
     }
 
-    const status = applicant?.application?.status;
-    if (status !== "DRAFT") {
-      throw new Error(
-        `Tidak dapat menghapus dokumen. Aplikasi sudah dalam status: ${status}`,
-      );
+    if (applicant?.application?.status !== "DRAFT") {
+      throw new Error(`Tidak dapat menghapus dokumen. Aplikasi dalam status: ${applicant?.application?.status}`);
     }
 
-    // Delete from disk then DB
-    await deleteFromLocal(document.fileUrl);
+    // Delete from Cloudinary
+    if (document.cloudId) {
+      await deleteFromCloudinary(document.cloudId);
+    }
+
+    // Delete from DB
     await prisma.document.delete({ where: { id: documentId } });
 
-    return { deleted: true };
+    return { success: true };
   },
 };

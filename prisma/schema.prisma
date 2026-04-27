@@ -49,7 +49,7 @@ model Applicant {
   userId      String @unique
 
   fullName    String
-  nisn        String?
+  nisn        String? @unique
   birthPlace  String
   birthDate   DateTime
   gender      String
@@ -87,6 +87,7 @@ model Document {
   fileUrl       String
   fileName      String
   fileSize      Int
+  cloudId       String? // Cloudinary public_id
 
   application Application @relation(fields: [applicationId], references: [id])
 
