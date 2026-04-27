@@ -1,30 +1,45 @@
 import prisma from "@/lib/prisma";
-import {
-  CreateApplicationInput,
-  UpdateApplicationInput,
-} from "@/lib/validators/application.schema";
-import { ApplicationStatus } from "@/types/application";
+import { UpdateApplicationInput } from "@/lib/validators/application.schema";
+
+/**
+ * Valid status transitions — enforced at service layer.
+ * SYSTEM_DESIGN.md §5: Draft → Submitted → Pending Verification → Verified → Accepted / Rejected
+ */
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  DRAFT: ["SUBMITTED"],
+  SUBMITTED: ["PENDING_VERIFICATION"],
+  PENDING_VERIFICATION: ["VERIFIED"],
+  VERIFIED: ["ACCEPTED", "REJECTED"],
+  ACCEPTED: [],
+  REJECTED: [],
+};
+
+export function canTransition(from: string, to: string): boolean {
+  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+}
 
 export const applicationService = {
   /**
-   * Get user's application
+   * GET — Read only. Returns null if applicant has no application yet.
    */
   async getApplication(userId: string) {
     const applicant = await prisma.applicant.findUnique({
       where: { userId },
       include: {
-        application: true,
+        application: {
+          include: { documents: true },
+        },
       },
     });
 
-    return applicant?.application;
+    return applicant?.application ?? null;
   },
 
   /**
-   * Create or get user's application
+   * POST — Idempotent create. Returns existing application or creates a DRAFT.
    */
   async getOrCreateApplication(userId: string) {
-    let applicant = await prisma.applicant.findUnique({
+    const applicant = await prisma.applicant.findUnique({
       where: { userId },
       include: { application: true },
     });
@@ -37,7 +52,7 @@ export const applicationService = {
       return applicant.application;
     }
 
-    // Create new application
+    // Create new DRAFT application
     const application = await prisma.application.create({
       data: {
         applicantId: applicant.id,
@@ -49,7 +64,8 @@ export const applicationService = {
   },
 
   /**
-   * Update application data
+   * PUT — Update application + applicant data. Only allowed in DRAFT status.
+   * Fixes: properly merges only provided fields (no undefined overwrite).
    */
   async updateApplication(userId: string, data: UpdateApplicationInput) {
     const applicant = await prisma.applicant.findUnique({
@@ -65,36 +81,45 @@ export const applicationService = {
       throw new Error("Application not found");
     }
 
-    // Only allow update if status is DRAFT
+    // Business rule: only DRAFT can be updated
     if (applicant.application.status !== "DRAFT") {
-      throw new Error("Cannot update application that has been submitted");
+      throw new Error(
+        `Cannot update application in status: ${applicant.application.status}`,
+      );
     }
 
-    // Update applicant info
-    if (Object.keys(data).length > 0) {
+    // Build applicant update payload — only include fields that were provided
+    const applicantUpdate: Record<string, unknown> = {};
+    if (data.fullName !== undefined) applicantUpdate.fullName = data.fullName;
+    if (data.nisn !== undefined) applicantUpdate.nisn = data.nisn;
+    if (data.birthPlace !== undefined)
+      applicantUpdate.birthPlace = data.birthPlace;
+    if (data.birthDate !== undefined)
+      applicantUpdate.birthDate = new Date(data.birthDate);
+    if (data.gender !== undefined) applicantUpdate.gender = data.gender;
+    if (data.address !== undefined) applicantUpdate.address = data.address;
+    if (data.phone !== undefined) applicantUpdate.phone = data.phone;
+
+    if (Object.keys(applicantUpdate).length > 0) {
       await prisma.applicant.update({
         where: { id: applicant.id },
-        data: {
-          fullName: data.fullName || applicant.fullName,
-          nisn: data.nisn || applicant.nisn,
-          birthPlace: data.birthPlace || applicant.birthPlace,
-          birthDate: data.birthDate
-            ? new Date(data.birthDate)
-            : applicant.birthDate,
-          gender: data.gender || applicant.gender,
-          address: data.address || applicant.address,
-          phone: data.phone || applicant.phone,
-        },
+        data: applicantUpdate,
       });
+    }
 
-      // Update application info
+    // Build application update payload — only include fields that were provided
+    const applicationUpdate: Record<string, unknown> = {};
+    if (data.schoolOrigin !== undefined)
+      applicationUpdate.schoolOrigin = data.schoolOrigin;
+    if (data.parentName !== undefined)
+      applicationUpdate.parentName = data.parentName;
+    if (data.parentPhone !== undefined)
+      applicationUpdate.parentPhone = data.parentPhone;
+
+    if (Object.keys(applicationUpdate).length > 0) {
       await prisma.application.update({
         where: { id: applicant.application.id },
-        data: {
-          schoolOrigin: data.schoolOrigin,
-          parentName: data.parentName,
-          parentPhone: data.parentPhone,
-        },
+        data: applicationUpdate,
       });
     }
 
@@ -102,7 +127,8 @@ export const applicationService = {
   },
 
   /**
-   * Submit application
+   * POST /submit — Transitions DRAFT → SUBMITTED.
+   * Enforces: required fields + at least one document + valid status.
    */
   async submitApplication(userId: string) {
     const applicant = await prisma.applicant.findUnique({
@@ -120,12 +146,14 @@ export const applicationService = {
 
     const app = applicant.application;
 
-    // Validate status
-    if (app.status !== "DRAFT") {
-      throw new Error(`Cannot submit application in ${app.status} status`);
+    // Enforce status transition
+    if (!canTransition(app.status, "SUBMITTED")) {
+      throw new Error(
+        `Cannot submit application in status: ${app.status}`,
+      );
     }
 
-    // Validate required fields
+    // Validate required applicant fields
     if (
       !applicant.fullName ||
       !applicant.birthPlace ||
@@ -134,31 +162,36 @@ export const applicationService = {
       !applicant.address ||
       !applicant.phone
     ) {
-      throw new Error("Please complete all personal information");
+      throw new Error(
+        "Harap lengkapi semua data pribadi sebelum submit",
+      );
     }
 
+    // Validate required application fields
     if (!app.schoolOrigin || !app.parentName || !app.parentPhone) {
-      throw new Error("Please complete all application information");
+      throw new Error(
+        "Harap lengkapi data aplikasi (asal sekolah, nama orang tua, telepon orang tua)",
+      );
     }
 
-    // Validate documents (require at least one)
+    // Validate at least one document uploaded
     if (app.documents.length === 0) {
-      throw new Error("Please upload at least one document");
+      throw new Error(
+        "Harap upload minimal satu dokumen sebelum submit",
+      );
     }
 
-    // Update status to SUBMITTED
     const updated = await prisma.application.update({
       where: { id: app.id },
-      data: {
-        status: "SUBMITTED",
-      },
+      data: { status: "SUBMITTED" },
     });
 
     return updated;
   },
 
   /**
-   * Check completion percentage
+   * Compute completion percentage for student dashboard.
+   * Total fields: 6 applicant + 3 application + 1 documents = 10
    */
   async getCompletionStatus(userId: string) {
     const applicant = await prisma.applicant.findUnique({
@@ -171,13 +204,13 @@ export const applicationService = {
     });
 
     if (!applicant?.application) {
-      return { percentage: 0, completed: 0, total: 8 };
+      return { percentage: 0, completed: 0, total: 10 };
     }
 
     let completed = 0;
-    const total = 8;
+    const total = 10;
 
-    // Check applicant fields (5 items)
+    // Applicant fields (6)
     if (applicant.fullName) completed++;
     if (applicant.birthPlace) completed++;
     if (applicant.birthDate) completed++;
@@ -185,18 +218,18 @@ export const applicationService = {
     if (applicant.address) completed++;
     if (applicant.phone) completed++;
 
-    // Check application fields (2 items)
+    // Application fields (3)
     if (applicant.application.schoolOrigin) completed++;
     if (applicant.application.parentName) completed++;
     if (applicant.application.parentPhone) completed++;
 
-    // Check documents
+    // Documents (1)
     if (applicant.application.documents.length > 0) completed++;
 
     return {
       percentage: Math.round((completed / total) * 100),
       completed,
-      total: total + 1, // Including documents
+      total,
     };
   },
 };

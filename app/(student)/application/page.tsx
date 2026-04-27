@@ -1,86 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-
-interface ApplicationData {
-  fullName: string;
-  nisn: string;
-  birthPlace: string;
-  birthDate: string;
-  gender: string;
-  address: string;
-  phone: string;
-  schoolOrigin: string;
-  parentName: string;
-  parentPhone: string;
-}
+import { useApplication } from "@/hooks/useApplication";
 
 export default function ApplicationPage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [appStatus, setAppStatus] = useState("DRAFT");
-  const [formData, setFormData] = useState<ApplicationData>({
-    fullName: "",
-    nisn: "",
-    birthPlace: "",
-    birthDate: "",
-    gender: "",
-    address: "",
-    phone: "",
-    schoolOrigin: "",
-    parentName: "",
-    parentPhone: "",
+  const { isLoading: authLoading } = useAuth();
+  const { application, applicant, isLoading, error: fetchError, updateApplication, submitApplication } =
+    useApplication();
+
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState({
+    fullName: applicant?.fullName || "",
+    nisn: applicant?.nisn || "",
+    birthPlace: applicant?.birthPlace || "",
+    birthDate: applicant?.birthDate?.split("T")[0] || "",
+    gender: applicant?.gender || "",
+    address: applicant?.address || "",
+    phone: applicant?.phone || "",
+    schoolOrigin: application?.schoolOrigin || "",
+    parentName: application?.parentName || "",
+    parentPhone: application?.parentPhone || "",
   });
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login");
-    }
-  }, [isLoading, user, router]);
-
-  useEffect(() => {
-    if (user) {
-      fetchApplication();
-    }
-  }, [user]);
-
-  const fetchApplication = async () => {
-    try {
-      const response = await fetch("/api/application", {
-        method: "GET",
-      });
-      const data = await response.json();
-
-      if (data.success) {
-        setAppStatus(data.data.status);
-        // Load applicant data
-        const applicantResponse = await fetch("/api/applicant");
-        const applicantData = await applicantResponse.json();
-        if (applicantData.success) {
-          const app = applicantData.data;
-          setFormData({
-            fullName: app.fullName || "",
-            nisn: app.nisn || "",
-            birthPlace: app.birthPlace || "",
-            birthDate: app.birthDate?.split("T")[0] || "",
-            gender: app.gender || "",
-            address: app.address || "",
-            phone: app.phone || "",
-            schoolOrigin: data.data.schoolOrigin || "",
-            parentName: data.data.parentName || "",
-            parentPhone: data.data.parentPhone || "",
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching application:", error);
-    }
-  };
+  // Sync formData when remote data loads
+  const [synced, setSynced] = useState(false);
+  if (!isLoading && !synced && (applicant || application)) {
+    setFormData({
+      fullName: applicant?.fullName || "",
+      nisn: applicant?.nisn || "",
+      birthPlace: applicant?.birthPlace || "",
+      birthDate: applicant?.birthDate?.split("T")[0] || "",
+      gender: applicant?.gender || "",
+      address: applicant?.address || "",
+      phone: applicant?.phone || "",
+      schoolOrigin: application?.schoolOrigin || "",
+      parentName: application?.parentName || "",
+      parentPhone: application?.parentPhone || "",
+    });
+    setSynced(true);
+  }
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -92,32 +57,20 @@ export default function ApplicationPage() {
   };
 
   const handleSave = async () => {
-    setError(null);
-    setSuccess(false);
-    setLoading(true);
+    setFormError(null);
+    setFormSuccess(null);
+    setSaving(true);
 
-    try {
-      const response = await fetch("/api/application", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+    const result = await updateApplication(formData);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Failed to save application");
-        return;
-      }
-
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
-      setError("Error saving application");
-      console.error("Save error:", error);
-    } finally {
-      setLoading(false);
+    if (!result.success) {
+      setFormError(result.message);
+    } else {
+      setFormSuccess(result.message);
+      setTimeout(() => setFormSuccess(null), 3000);
+      setSynced(false); // allow re-sync after save
     }
+    setSaving(false);
   };
 
   const handleSubmit = async () => {
@@ -129,35 +82,32 @@ export default function ApplicationPage() {
       return;
     }
 
-    setError(null);
-    setLoading(true);
+    setFormError(null);
+    setSubmitting(true);
 
-    try {
-      const response = await fetch("/api/application/submit", {
-        method: "POST",
-      });
+    const result = await submitApplication();
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Failed to submit application");
-        return;
-      }
-
-      setAppStatus(data.data.status);
-      alert("Aplikasi berhasil disubmit! Silakan upload dokumen.");
+    if (!result.success) {
+      setFormError(result.message);
+    } else {
       router.push("/documents");
-    } catch (error) {
-      setError("Error submitting application");
-      console.error("Submit error:", error);
-    } finally {
-      setLoading(false);
     }
+
+    setSubmitting(false);
   };
 
-  if (isLoading) {
-    return <div className="text-center py-20">Loading...</div>;
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Memuat data...</p>
+        </div>
+      </div>
+    );
   }
+
+  const isDraft = application?.status === "DRAFT";
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -168,27 +118,38 @@ export default function ApplicationPage() {
             Lengkapi data pribadi dan aplikasi Anda
           </p>
 
-          {appStatus !== "DRAFT" && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-300 rounded-lg text-blue-700">
-              ℹ️ Aplikasi Anda sedang dalam status: <strong>{appStatus}</strong>
-            </div>
-          )}
-
-          {error && (
+          {/* Fetch error alert */}
+          {fetchError && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              ❌ {error}
+              ⚠️ {fetchError}
             </div>
           )}
 
-          {success && (
+          {/* Non-DRAFT status banner */}
+          {!isDraft && application && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-300 rounded-lg text-blue-700">
+              ℹ️ Status aplikasi Anda:{" "}
+              <strong>{application.status}</strong>. Data tidak dapat diubah.
+            </div>
+          )}
+
+          {/* Form error */}
+          {formError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              ❌ {formError}
+            </div>
+          )}
+
+          {/* Form success */}
+          {formSuccess && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-              ✅ Data berhasil disimpan
+              ✅ {formSuccess}
             </div>
           )}
 
-          {appStatus === "DRAFT" ? (
+          {isDraft ? (
             <>
-              {/* Personal Data Section */}
+              {/* ── Personal Data ─────────────────────────────── */}
               <div className="mb-8">
                 <h2 className="text-xl font-bold mb-4 pb-2 border-b">
                   Data Pribadi
@@ -200,7 +161,7 @@ export default function ApplicationPage() {
                       htmlFor="fullName"
                       className="block text-sm font-medium text-gray-700 mb-1"
                     >
-                      Nama Lengkap *
+                      Nama Lengkap <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="fullName"
@@ -210,7 +171,7 @@ export default function ApplicationPage() {
                       value={formData.fullName}
                       onChange={handleInputChange}
                       className="input-field"
-                      disabled={loading}
+                      disabled={saving || submitting}
                     />
                   </div>
 
@@ -229,7 +190,7 @@ export default function ApplicationPage() {
                         value={formData.nisn}
                         onChange={handleInputChange}
                         className="input-field"
-                        disabled={loading}
+                        disabled={saving || submitting}
                       />
                     </div>
 
@@ -238,7 +199,7 @@ export default function ApplicationPage() {
                         htmlFor="gender"
                         className="block text-sm font-medium text-gray-700 mb-1"
                       >
-                        Jenis Kelamin *
+                        Jenis Kelamin <span className="text-red-500">*</span>
                       </label>
                       <select
                         id="gender"
@@ -247,7 +208,7 @@ export default function ApplicationPage() {
                         value={formData.gender}
                         onChange={handleInputChange}
                         className="input-field"
-                        disabled={loading}
+                        disabled={saving || submitting}
                       >
                         <option value="">Pilih Jenis Kelamin</option>
                         <option value="MALE">Laki-laki</option>
@@ -262,7 +223,7 @@ export default function ApplicationPage() {
                         htmlFor="birthPlace"
                         className="block text-sm font-medium text-gray-700 mb-1"
                       >
-                        Tempat Lahir *
+                        Tempat Lahir <span className="text-red-500">*</span>
                       </label>
                       <input
                         id="birthPlace"
@@ -272,7 +233,7 @@ export default function ApplicationPage() {
                         value={formData.birthPlace}
                         onChange={handleInputChange}
                         className="input-field"
-                        disabled={loading}
+                        disabled={saving || submitting}
                       />
                     </div>
 
@@ -281,7 +242,7 @@ export default function ApplicationPage() {
                         htmlFor="birthDate"
                         className="block text-sm font-medium text-gray-700 mb-1"
                       >
-                        Tanggal Lahir *
+                        Tanggal Lahir <span className="text-red-500">*</span>
                       </label>
                       <input
                         id="birthDate"
@@ -291,7 +252,7 @@ export default function ApplicationPage() {
                         value={formData.birthDate}
                         onChange={handleInputChange}
                         className="input-field"
-                        disabled={loading}
+                        disabled={saving || submitting}
                       />
                     </div>
                   </div>
@@ -301,7 +262,7 @@ export default function ApplicationPage() {
                       htmlFor="phone"
                       className="block text-sm font-medium text-gray-700 mb-1"
                     >
-                      Nomor Telepon *
+                      Nomor Telepon <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="phone"
@@ -311,7 +272,7 @@ export default function ApplicationPage() {
                       value={formData.phone}
                       onChange={handleInputChange}
                       className="input-field"
-                      disabled={loading}
+                      disabled={saving || submitting}
                     />
                   </div>
 
@@ -320,7 +281,7 @@ export default function ApplicationPage() {
                       htmlFor="address"
                       className="block text-sm font-medium text-gray-700 mb-1"
                     >
-                      Alamat *
+                      Alamat <span className="text-red-500">*</span>
                     </label>
                     <textarea
                       id="address"
@@ -330,13 +291,13 @@ export default function ApplicationPage() {
                       onChange={handleInputChange}
                       rows={3}
                       className="input-field"
-                      disabled={loading}
+                      disabled={saving || submitting}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Application Data Section */}
+              {/* ── Application Data ──────────────────────────── */}
               <div className="mb-8">
                 <h2 className="text-xl font-bold mb-4 pb-2 border-b">
                   Data Aplikasi
@@ -348,7 +309,7 @@ export default function ApplicationPage() {
                       htmlFor="schoolOrigin"
                       className="block text-sm font-medium text-gray-700 mb-1"
                     >
-                      Asal Sekolah *
+                      Asal Sekolah <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="schoolOrigin"
@@ -358,7 +319,7 @@ export default function ApplicationPage() {
                       value={formData.schoolOrigin}
                       onChange={handleInputChange}
                       className="input-field"
-                      disabled={loading}
+                      disabled={saving || submitting}
                     />
                   </div>
 
@@ -367,7 +328,7 @@ export default function ApplicationPage() {
                       htmlFor="parentName"
                       className="block text-sm font-medium text-gray-700 mb-1"
                     >
-                      Nama Orang Tua/Wali *
+                      Nama Orang Tua / Wali <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="parentName"
@@ -377,7 +338,7 @@ export default function ApplicationPage() {
                       value={formData.parentName}
                       onChange={handleInputChange}
                       className="input-field"
-                      disabled={loading}
+                      disabled={saving || submitting}
                     />
                   </div>
 
@@ -386,7 +347,8 @@ export default function ApplicationPage() {
                       htmlFor="parentPhone"
                       className="block text-sm font-medium text-gray-700 mb-1"
                     >
-                      Nomor Telepon Orang Tua/Wali *
+                      Nomor Telepon Orang Tua / Wali{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       id="parentPhone"
@@ -396,37 +358,51 @@ export default function ApplicationPage() {
                       value={formData.parentPhone}
                       onChange={handleInputChange}
                       className="input-field"
-                      disabled={loading}
+                      disabled={saving || submitting}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* ── Actions ───────────────────────────────────── */}
               <div className="flex gap-4">
                 <button
+                  id="btn-save-application"
                   onClick={handleSave}
-                  disabled={loading}
+                  disabled={saving || submitting}
                   className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Menyimpan..." : "Simpan"}
+                  {saving ? "Menyimpan..." : "Simpan Draft"}
                 </button>
                 <button
+                  id="btn-submit-application"
                   onClick={handleSubmit}
-                  disabled={loading}
+                  disabled={saving || submitting}
                   className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Memproses..." : "Submit Aplikasi"}
+                  {submitting ? "Memproses..." : "Submit Aplikasi"}
                 </button>
               </div>
+
+              <p className="mt-3 text-xs text-gray-500 text-center">
+                ⚠️ Setelah submit, data tidak dapat diubah. Pastikan semua
+                dokumen sudah diunggah.
+              </p>
             </>
           ) : (
             <div className="bg-yellow-50 border border-yellow-300 p-6 rounded-lg text-yellow-800">
               <p className="font-semibold mb-2">⚠️ Aplikasi Terkunci</p>
               <p>Aplikasi Anda telah disubmit dan tidak dapat diubah lagi.</p>
               <p className="mt-2">
-                Status saat ini: <strong>{appStatus}</strong>
+                Status saat ini:{" "}
+                <strong className="text-blue-700">{application?.status}</strong>
               </p>
+              <a
+                href="/status"
+                className="inline-block mt-4 text-blue-600 hover:underline text-sm"
+              >
+                → Lihat status verifikasi
+              </a>
             </div>
           )}
         </div>

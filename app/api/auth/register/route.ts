@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Validate input
+    // Validate input with Zod
     const validation = RegisterSchema.safeParse(body);
     if (!validation.success) {
       const errors = validation.error.flatten();
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     const { email, password } = validation.data;
 
-    // Check if user already exists
+    // Check if email is already taken
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -41,49 +41,45 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        role: "STUDENT",
-      },
-    });
+    // Atomic: create User + Applicant + Application in a transaction
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          role: "STUDENT",
+        },
+      });
 
-    // Create applicant profile
-    await prisma.applicant.create({
-      data: {
-        userId: user.id,
-        fullName: "",
-        birthPlace: "",
-        birthDate: new Date(),
-        gender: "",
-        address: "",
-        phone: "",
-      },
-    });
+      // Applicant profile — placeholder values, filled via /application form
+      const applicant = await tx.applicant.create({
+        data: {
+          userId: user.id,
+          fullName: "",
+          birthPlace: "",
+          birthDate: new Date(0), // epoch as placeholder — replaced on first save
+          gender: "",
+          address: "",
+          phone: "",
+        },
+      });
 
-    // Create initial application
-    const applicant = await prisma.applicant.findUnique({
-      where: { userId: user.id },
-    });
-
-    if (applicant) {
-      await prisma.application.create({
+      // Create initial DRAFT application
+      await tx.application.create({
         data: {
           applicantId: applicant.id,
           status: "DRAFT",
         },
       });
-    }
+
+      return user;
+    });
 
     return NextResponse.json(
       {
         success: true,
         message: "Pendaftaran berhasil. Silakan login.",
-        data: {
-          email: user.email,
-        },
+        data: { email },
       },
       { status: 201 },
     );

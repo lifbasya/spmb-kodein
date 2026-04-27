@@ -50,7 +50,10 @@ export default function LoginPage() {
       }
 
       // Redirect based on role
-      router.push("/dashboard");
+      const sessionResponse = await fetch("/api/auth/session");
+      const sessionData = await sessionResponse.json();
+      const role = sessionData?.user?.role;
+      router.push(role === "ADMIN" ? "/admin" : "/dashboard");
     } catch (error) {
       setError("Terjadi kesalahan. Silakan coba lagi.");
       console.error("Login error:", error);

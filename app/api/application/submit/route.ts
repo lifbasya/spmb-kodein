@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth-helpers";
 import { applicationService } from "@/lib/services/application.service";
 
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/application/submit
+ * Transitions application status: DRAFT → SUBMITTED
+ * Business rules enforced in applicationService.submitApplication:
+ *   - All required fields must be filled
+ *   - At least one document must be uploaded
+ *   - Status must be DRAFT
+ */
+export async function POST(_request: NextRequest) {
   try {
     const session = await getSession();
     if (!session?.user) {
@@ -19,19 +27,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: "Application submitted successfully",
+        message: "Aplikasi berhasil disubmit. Tim admin akan segera memverifikasi.",
         data: application,
       },
       { status: 200 },
     );
   } catch (error: any) {
     console.error("Submit application error:", error);
+
+    // Business logic errors → 422 Unprocessable Entity
+    // (distinct from validation errors 400 and server errors 500)
+    const isBusinessError = [
+      "Cannot submit",
+      "Harap lengkapi",
+      "Application not found",
+    ].some((msg) => error.message?.includes(msg));
+
     return NextResponse.json(
       {
         success: false,
-        message: error.message || "Failed to submit application",
+        message: error.message || "Gagal submit aplikasi",
       },
-      { status: 400 },
+      { status: isBusinessError ? 422 : 500 },
     );
   }
 }
