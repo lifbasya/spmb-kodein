@@ -1,18 +1,24 @@
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
+import "dotenv/config";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pkg from "pg";
+import bcrypt from "bcryptjs";
 
-const connectionString = process.env.DATABASE_URL || "postgresql://kartonosaleh@localhost:5432/spmb_db?schema=public";
+const { Pool } = pkg;
+
+const connectionString =
+  process.env.DATABASE_URL ||
+  "postgresql://kartonosaleh@localhost:5432/spmb_db?schema=public";
+
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const adminEmail = 'admin@kodein.com';
-  const hashedPassword = await bcrypt.hash('Admin123!', 10);
+  const adminEmail = "admin@kodein.com";
+  const hashedPassword = await bcrypt.hash("Admin123!", 10);
 
-  console.log('--- Memulai Seeding ---');
+  console.log("--- Memulai Seeding ---");
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
@@ -22,17 +28,17 @@ async function main() {
     create: {
       email: adminEmail,
       password: hashedPassword,
-      role: 'ADMIN',
+      role: "ADMIN",
     },
   });
 
   console.log(`Admin user berhasil disiapkan: ${admin.email}`);
-  console.log('--- Seeding Selesai ---');
+  console.log("--- Seeding Selesai ---");
 }
 
 main()
   .catch((e) => {
-    console.error('Error saat seeding:', e);
+    console.error("Error saat seeding:", e);
     process.exit(1);
   })
   .finally(async () => {
